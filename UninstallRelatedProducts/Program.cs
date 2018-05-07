@@ -9,16 +9,22 @@ namespace UninstallRelatedProducts
 
         static void Main(string[] args)
         {
-            using (var logger = new Logger(null))
+            Guid upgradeCode;
+            if (args.Length < 1 || args.Length > 2 || !Guid.TryParse(args[0], out upgradeCode))
             {
-                Guid upgradeCode;
-                if (args.Length != 1 || !Guid.TryParse(args[0], out upgradeCode))
-                {
-                    logger.Log("usage:\n     UninstallRelatedProducts <GUID>");
-                    Environment.Exit(errExit);
-                    return; // To avoid uninitialized error
-                }
+                Console.WriteLine("usage:\n     UninstallRelatedProducts <GUID> <LogFile>");
+                Environment.Exit(errExit);
+                return; // To avoid uninitialized error
+            }
 
+            string logFile = null;
+            if (args.Length == 2)
+            {
+                logFile = args[1];
+            }
+
+            using (var logger = new Logger(logFile))
+            {
                 try
                 {
                     var productCodes = Msi.GetRelatedProducts(upgradeCode).ToList();
@@ -43,7 +49,7 @@ namespace UninstallRelatedProducts
                 catch (Exception e)
                 {
                     logger.Log(e);
-                    throw;
+                    Environment.Exit(errExit);
                 }
             }
         }
