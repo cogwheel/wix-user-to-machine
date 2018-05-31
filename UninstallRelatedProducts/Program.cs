@@ -1,20 +1,24 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace UninstallRelatedProducts
 {
     class Program
     {
-        const int errExit = 1;
+        const int errUsage = 1;
+        const int errLogger = 2;
+        const int errQuery = 3;
+        const int errAllUsers = 4;
+        const int errUninstall = 5;
 
-        static void Main(string[] args)
+        static int Main(string[] args)
         {
             Guid upgradeCode;
             if (args.Length < 1 || args.Length > 2 || !Guid.TryParse(args[0], out upgradeCode))
             {
                 Console.WriteLine("usage:\n     UninstallRelatedProducts <GUID> <LogFile>");
-                Environment.Exit(errExit);
-                return; // To avoid uninitialized error
+                return errUsage;
             }
 
             string logFile = null;
@@ -23,34 +27,60 @@ namespace UninstallRelatedProducts
                 logFile = args[1];
             }
 
-            using (var logger = new Logger(logFile))
+            try
             {
-                try
+                using (var logger = new Logger(logFile))
                 {
-                    var productCodes = Msi.GetRelatedProducts(upgradeCode).ToList();
-                    logger.Log("Number of related products found: " + productCodes.Count);
+                    List<Guid> productCodes;
+                    try
+                    {
+                        productCodes = Msi.GetRelatedProducts(upgradeCode).ToList();
+                        logger.Log("Number of related products found: " + productCodes.Count);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Log($"Unable to query related products: {ex.Message}");
+                        return errQuery;
+                    }
 
                     foreach (var product in productCodes)
                     {
-                        logger.Log("Product code: " + product);
-                        var allUsers = Msi.IsAllUsers(product);
-                        logger.Log("All users: " + allUsers);
-                        if (allUsers)
+                        try
                         {
-                            Console.WriteLine("Skipping.");
-                            continue;
+                            logger.Log("Product code: " + product);
+                            var allUsers = Msi.IsAllUsers(product);
+                            logger.Log("All users: " + allUsers);
+                            if (allUsers)
+                            {
+                                Console.WriteLine("Skipping.");
+                                continue;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.Log($"Failed to check if product is installed for all users: {ex.Message}");
+                            return errAllUsers;
                         }
 
-                        Msi.Uninstall(product, silent: true);
+                        try
+                        {
+                            Msi.Uninstall(product, silent: true);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.Log($"Failed to uninstall previous version: {ex.Message}");
+                            return errUninstall;
+                        }
                     }
 
                     logger.Log("Uninstall completed successfully");
+                    return 0;
                 }
-                catch (Exception e)
-                {
-                    logger.Log(e);
-                    Environment.Exit(errExit);
-                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating log file: {ex.Message}");
+                return errLogger;
             }
         }
     }
