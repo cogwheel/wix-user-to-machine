@@ -9,7 +9,7 @@ namespace UninstallRelatedProducts
         const int errUsage = 1;
         const int errLogger = 2;
         const int errQuery = 3;
-        const int errAllUsers = 4;
+        //const int errAllUsers = 4;   // no longer used
         const int errUninstall = 5;
 
         static int Main(string[] args)
@@ -59,7 +59,8 @@ namespace UninstallRelatedProducts
                         catch (Exception ex)
                         {
                             logger.Log($"Failed to check if product is installed for all users: {ex.Message}");
-                            return errAllUsers;
+                            // ignore this error; previous install may be corrupted. allow installation to continue
+                            break;
                         }
 
                         try
@@ -73,7 +74,7 @@ namespace UninstallRelatedProducts
                         }
                     }
 
-                    logger.Log("Uninstall completed successfully");
+                    logger.Log("Legacy version check completed successfully");
                     return 0;
                 }
             }
